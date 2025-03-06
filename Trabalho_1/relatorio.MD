@@ -38,11 +38,15 @@ Utilizando o método de rigidez direto obtemos as tensões das barras da treliç
 
 Onde os valores negativos indicam que a barras estão em compressão e os valores positivos indicam que as barras estão em tração.
 
-## 3. Comparação com resultados disponiveis.
+## 3. Comparação com resultados disponiveis
 
-Ao comparar os valores obtidos e mencionados nas tabelas acima com os disponíveis no link, https://drive.google.com/file/d/1uwsdMndz3jo5VpDi6VDPcPgXZZUvXpn-/view, percebemos que os valores são iguais, indicando que o script desenvolvido está correto.
+Ao comparar os valores obtidos e mencionados nas tabelas acima com os disponíveis no link, <https://drive.google.com/file/d/1uwsdMndz3jo5VpDi6VDPcPgXZZUvXpn-/view>, percebemos que os valores são iguais, indicando que o script desenvolvido está correto.
 
 ## 4. Grafico com configuração deformada da treliça
+
+Para comparação visual da deformação da treliça, foi plotado um gráfico com a configuração inicial e a configuração deformada da treliça.
+
+![alt text](untitled1.png)
 
 ## 5. Codigo computacional implementado
 
@@ -61,7 +65,7 @@ Por fim, são calculadas as tensões de cada barra.
 
 Codigo também disponivel em:
 
-
+<https://github.com/freedxmgxd/metodos-computacionais-para-analise-estrutural/blob/main/Trabalho_1/main.m>
 
 ```matlab
 clear all
@@ -135,6 +139,8 @@ D = zeros(14,1);
 indices_restantes = setdiff(1:14, D0);
 D(indices_restantes) = D_reduzido;
 
+disp(D);
+
 tensoes = zeros(11,1);
 
 for i= 1:11
@@ -146,8 +152,49 @@ for i= 1:11
   s = sin(beta(i));
   
   deformation = (uj - ui)*c + (vj - vi)*s;
-  tensoes(i) = (A*E/L(i))*deformation;
+  tensoes(i) = (E/L(i))*deformation;
 end
 
 disp(tensoes);
+
+
+% Coordenadas dos nós
+x = [0, 1, 3,  2,  1,  0,  1];
+y = [0, 0, 0, -1, -2, -3, -1];
+
+% Deslocamentos nodais
+Ux = D(1:2:end);
+Uy = D(2:2:end);
+
+% Coordenadas dos nós deformados
+fator_escala = 10; % Exagera a deformação
+x_deformado = x + fator_escala * Ux';
+y_deformado = y + fator_escala * Uy';
+
+% Conectividade das barras
+barras = [1 2; 1 7; 1 5; 1 6; 2 3; 2 4; 2 7; 3 4; 4 7; 5 6; 5 7;]
+
+% Plot da treliça na mesma figura
+figure;
+
+% Plot da configuração inicial
+for i = 1:size(barras, 1)
+  no1 = barras(i, 1);
+  no2 = barras(i, 2);
+  h_inicial = plot([x(no1), x(no2)], [y(no1), y(no2)], 'b-'); % Linhas azuis para a configuração inicial
+  hold on;
+end
+h_inicial_nos = plot(x, y, 'bo', 'MarkerFaceColor', 'b'); % Nós azuis
+
+% Plot da configuração deformada
+for i = 1:size(barras, 1)
+  no1 = barras(i, 1);
+  no2 = barras(i, 2);
+  h_deformada = plot([x_deformado(no1), x_deformado(no2)], [y_deformado(no1), y_deformado(no2)], 'r--'); % Linhas vermelhas tracejadas para a configuração deformada
+end
+h_deformada_nos = plot(x_deformado, y_deformado, 'ro', 'MarkerFaceColor', 'r'); % Nós vermelhos
+
+title('Treliça - Configuração Inicial e Deformada');
+axis equal;
+legend([h_inicial, h_deformada], 'Inicial', 'Deformada');
 ```
