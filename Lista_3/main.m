@@ -39,7 +39,7 @@ for i_s = 1:length(S)
     for j_deltaX = 1:length(deltaX)
         deltax = deltaX(j_deltaX);
         n_knots = L / deltax;
-        deltat = s * deltax^2 / alpha;
+        deltat = (s * deltax^2) / alpha;
 
         steps = int64(t_simul / deltat);
 
@@ -47,7 +47,7 @@ for i_s = 1:length(S)
         T(1, :) = Ta;
         T(n_knots + 1, :) = Tb;
 
-        % Condićoes Iniciais
+        % %Condićoes Iniciais
         % T(1:1) = 50;
         % T(n_knots + 1, 1) = 50;
 
@@ -92,43 +92,43 @@ for i_s = 1:length(S)
         % Write the data
         fprintf(fileID, '%.3f,%.3e,%.2f,%.4f,%.2f\n', s, deltat, deltax, RMS_novo, RMS_antigo / RMS_novo);
 
-        % % Show the plot
-        % x = linspace(0, L, n_knots + 1);
-        % t = linspace(0, t_simul, steps + 1);
-        % T_final = T(:, end);
-        % T_final_exata = T_exata(:, end);
+        % Show the plot
+        x = linspace(0, L, n_knots + 1);
+        t = linspace(0, t_simul, steps + 1);
+        T_final = T(:, end);
+        T_final_exata = T_exata(:, end);
 
-        % figure(1)
-        % % Plot final numerical solution with scatter points and line
-        % plot(x, T_final, 'r-', 'LineWidth', 2);
-        % hold on
-        % scatter(x, T_final, 50, 'r', 'filled');
-        % % Plot exact solution with dotted line
-        % plot(x, T_final_exata, 'b:', 'LineWidth', 2);
+        figure(1)
+        % Plot final numerical solution with scatter points and line
+        plot(x, T_final, 'r-', 'LineWidth', 2);
+        hold on
+        scatter(x, T_final, 50, 'r', 'filled');
+        % Plot exact solution with dotted line
+        plot(x, T_final_exata, 'b:', 'LineWidth', 2);
 
-        % % Add temperature evolution curves with lighter colors and scatter points
-        % for i = 1:floor((steps + 1) / 5):steps% Plot fewer lines to avoid overcrowding
-        %     plot(x, T(:, i), 'Color', [0.7 0.7 0.7], 'LineWidth', 1);
-        %     scatter(x, T(:, i), 25, [0.7 0.7 0.7], 'filled');
-        % end
+        % Add temperature evolution curves with lighter colors and scatter points
+        for i = 1:floor((steps + 1) / 5):steps% Plot fewer lines to avoid overcrowding
+            plot(x, T(:, i), 'Color', [0.7 0.7 0.7], 'LineWidth', 1);
+            scatter(x, T(:, i), 25, [0.7 0.7 0.7], 'filled');
+        end
 
-        % xlabel('x [m]');
-        % ylabel('T [°C]');
-        % legend('T numérico', '', 'T exato', 'Evolução temporal', '');
-        % grid on;
+        xlabel('x [m]');
+        ylabel('T [°C]');
+        legend('T numérico', '', 'T exato', 'Evolução temporal', '');
+        grid on;
 
-        % % Save the figure with high quality
-        % filename = sprintf('graphTx-s%.3f-dx%.2f.png', s, deltax);
-        % set(gcf, 'Position', [100, 100, 800, 600]); % Larger figure size
-        % print(filename, '-dpng', '-r300'); % 300 dpi resolution
+        % Save the figure with high quality
+        filename = sprintf('graphTx-s%.3f-dx%.2f.png', s, deltax);
+        set(gcf, 'Position', [100, 100, 800, 600]); % Larger figure size
+        print(filename, '-dpng', '-r300'); % 300 dpi resolution
 
-        % % Check if file exists and delete it (will be overwritten anyway by print)
-        % if exist(filename, 'file')
-        %     delete(filename);
-        %     print(filename, '-dpng', '-r300'); % Print again to ensure it's saved
-        % end
+        % Check if file exists and delete it (will be overwritten anyway by print)
+        if exist(filename, 'file')
+            delete(filename);
+            print(filename, '-dpng', '-r300'); % Print again to ensure it's saved
+        end
 
-        % close(figure(1)); % Close the figure to avoid displaying it multiple times
+        close(figure(1)); % Close the figure to avoid displaying it multiple times
 
     end
 
