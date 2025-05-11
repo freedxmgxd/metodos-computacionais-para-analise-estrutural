@@ -2,29 +2,24 @@ clear all
 close all
 clc
 
-L_total = 200; % in
+L_total = 3; % m
 n_sections = 20;
 L = L_total / n_sections; % m
 
-E_beam = 6.58e6; % psi
-I_beam = 100; % in^4
+E_beam = 200e9; % Pa
+I_beam = 8 * 10^(-4); % m^4
 A_beam = 2 * 10^(-2); % m^2
-rho_beam = 0.1 / A_beam; % kg/m^3
+rho_beam = 7800; % kg/m^3
 
-f_cut = 1000; % Hz
+f_cut = 100; % Hz
 
-% h = 0.003; % s
 total_time = 1; % s
 
 % Condições de contorno
-D0 = [1, 2, n_sections * 2 + 1];
+D0 = [1, n_sections * 2 + 1];
 
 K = zeros((n_sections + 1) * 2);
 M = zeros((n_sections + 1) * 2);
-
-alpha = 0.00;
-beta = 0.00;
-C = alpha * M + beta * K;
 
 for n = 1:n_sections
 
@@ -53,15 +48,12 @@ end
 
 K_reduzido = K;
 M_reduzido = M;
-C_reduzido = C;
 D_aux_reduzido = zeros((n_sections + 1) * 2, 1);
 
 K_reduzido(D0, :) = [];
 K_reduzido(:, D0) = [];
 M_reduzido(D0, :) = [];
 M_reduzido(:, D0) = [];
-C_reduzido(D0, :) = [];
-C_reduzido(:, D0) = [];
 
 [D_aux, Lambda_aux] = eig(M_reduzido \ K_reduzido);
 
@@ -80,34 +72,64 @@ frequencys = modes / (2 * pi)
 [c index] = min(abs(frequencys - f_cut));
 
 frequency = frequencys(index)
-% h = 2 * pi / (frequency * 10);
-h = 0.003
+
+h = 2 * pi / (frequency * 10);
+% h = 0.003
+
+critical_damping = 0.05; % Critical damping ratio
+
+A = [1 / modes(1), modes(1);
+    1 / modes(2), modes(2); ]
+
+b = 2 * critical_damping * [1;
+                    1; ];
+
+x = A \ b;
+
+alpha = x(1)
+beta = x(2)
+C = alpha * M + beta * K;
+
+C_reduzido = C;
+C_reduzido(D0, :) = [];
+C_reduzido(:, D0) = [];
 
 n_steps = round(total_time / h);
 
 R = zeros((n_sections + 1) * 2, n_steps);
 
-force_0 = 10000;
+force_0 = -380000; % N
+force_1 = -250000;
 
-force_element = floor(n_sections / 2) + 1;
+L_fraction = 1/4; % Fraction of the total length where the force is applied
 
-a = L_total / 2 - (force_element - 1) * L;
-b = L - a;
+element_force = floor(n_sections * L_fraction) + 1;
 
-node = floor((force_element * 2)) - 1
+node = (element_force * 2 - 1)
 
 for n = 1:(0.2 / h)
 
-    if n <= (0.1 / h)
-        P = -force_0;
-    else
-        P = -force_0 + (force_0 / (0.1 / h)) * (n -(0.1 / h) - 1);
-    end
+    w = force_0 + ((force_1 - force_0) / (0.2 / h)) * (n - 1);
+    x_w = L_total * L_fraction;
+    a = w / (L_total - x_w);
+    w_b = w;
 
-    R(force_element * 2 - 1, n) += -(P * b^2 * (L + 2 * a)) / L^3;
-    R(force_element * 2, n) += -(P * a * b^2) / L^2;
-    R(force_element * 2 + 1, n) += -(P * a^2 * (L + 2 * b)) / L^3;
-    R(force_element * 2 + 2, n) += +(P * a^2 * b) / L^2;
+    for i = 1:n_sections
+
+        if i < element_force
+            w_a = 0;
+            w_b = 0;
+        else
+            w_a = w - a * ((i - 1) * L - x_w);
+            w_b = w - a * (i * L - x_w);
+        end
+
+        R(i * 2 - 1, n) += -w_b * L / 2 - 3 * (w_a - w_b) * L / 20;
+        R(i * 2, n) += (-w_b * L^2) / 12 - (w_a - w_b) * L^2/30;
+        R(i * 2 + 1, n) += -w_b * L / 2 - 7 * (w_a - w_b) * L / 20;
+        R(i * 2 + 2, n) += (w_b * L^2) / 12 + (w_a - w_b) * L^2/20;
+
+    end
 
 end
 
@@ -212,54 +234,17 @@ Dddot_expanded(remaining_indices, :) = Dddot;
 figure;
 
 for i = 1:n_steps
-    plot((0:L_total / n_sections:L_total), transpose(D_expanded(1:2:end, i)), 'k--o', 'LineWidth', 0.5);
+    plot((0:L_total / n_sections:L_total), transpose(D_expanded(1:2:end, i)), 'k--o', 'LineWidth', 0.1);
     hold on;
 end
 
+plot((0:L_total / n_sections:L_total), transpose(D_expanded(1:2:end, 1)), 'r--.', 'LineWidth', 0.5);
 title('Envelope do deslocamento');
 xlabel('Posição (m)');
 ylabel('Deslocamento (m)');
 grid on;
 
-% Create figure for displacement animation
 figure;
-
-% Create the main plot axes
-plot_handle = plot((0:L_total / n_sections:L_total), transpose(D_expanded(1:2:end, 1)), 'k--o', 'LineWidth', 1.5);
-title('Deslocamento ao longo do tempo');
-xlabel('Posição (m)');
-ylabel('Deslocamento (m)');
-grid on;
-
-% Find the maximum displacement for consistent y-axis limits
-max_disp = max(max(abs(D_expanded(1:2:end, :))));
-ylim([-max_disp * 1.1 max_disp * 1.1]);
-
-% Text display for time
-time_text = text(0.05, 0.95, 'Tempo: 0.000 s', 'Units', 'normalized');
-
-% Animation parameters
-frame_skip = max(1, floor(n_steps / 100)); % Skip frames to speed up animation if too many steps
-pause_time = 0.05; % Time between frames in seconds
-is_running = true; % Flag to control animation
-
-% Run the animation
-for i = 1:frame_skip:n_steps
-    % Update the plot data
-    set(plot_handle, 'YData', transpose(D_expanded(1:2:end, i)));
-
-    % Update time display
-    set(time_text, 'String', ['Tempo: ' num2str((i - 1) * h, '%.3f') ' s']);
-
-    % Refresh the display
-    drawnow;
-
-    % Pause to control animation speed
-    pause(pause_time);
-end
-
-figure;
-
 % Subplot for force
 subplot(2, 1, 1);
 plot((0:n_steps - 1) * h, R_expanded(node, :), 'LineWidth', 2);
@@ -270,9 +255,9 @@ ylabel('Força (N)');
 grid on;
 
 subplot(2, 1, 2);
-plot((0:n_steps - 1) * h, R_til_expanded(node, :), 'LineWidth', 2);
+plot((0:L_total / n_sections:L_total), transpose(R_expanded(1:2:end, 1)), 'k--.', 'LineWidth', 0.5);
 title(['Força no nó ', num2str((node + 1) / 2)]);
-xlabel('Tempo (s)');
+xlabel('Posição (m)');
 ylabel('Força (N)');
 % ylim([-max_force_value max_force_value]); % Set unified y-axis limits
 grid on;
@@ -325,6 +310,75 @@ ylabel('Aceleração (rad/s²)');
 % ylim([-200 200]); % Set unified y-axis limits
 grid on;
 
-% while (true)
-%     pause(0.001);
-% end
+% Create figure for displacement animation
+figure;
+
+% Create the main plot axes
+plot_handle = plot((0:L_total / n_sections:L_total), transpose(D_expanded(1:2:end, 1)), 'k--o', 'LineWidth', 1.5);
+title('Deslocamento ao longo do tempo');
+xlabel('Posição (m)');
+ylabel('Deslocamento (m)');
+grid on;
+
+% Find the maximum displacement for consistent y-axis limits
+max_disp = max(max(abs(D_expanded(1:2:end, :))));
+ylim([-max_disp * 1.1 max_disp * 1.1]);
+
+% Text display for time
+time_text = text(0.05, 0.95, 'Tempo: 0.000 s', 'Units', 'normalized');
+
+% Animation parameters
+frame_skip = max(1, floor(n_steps / 100)); % Skip frames to speed up animation if too many steps
+pause_time = 0.05; % Time between frames in seconds
+is_running = true; % Flag to control animation
+
+% Run the animation
+for i = 1:n_steps
+    % Update the plot data
+    set(plot_handle, 'YData', transpose(D_expanded(1:2:end, i)));
+
+    % Update time display
+    set(time_text, 'String', ['Tempo: ' num2str((i - 1) * h, '%.3f') ' s']);
+
+    % Refresh the display
+    drawnow;
+
+    % Pause to control animation speed
+    pause(pause_time);
+end
+
+% Create figure for displacement animation
+figure;
+% Create the main plot axes
+plot_handle = plot((0:L_total / n_sections:L_total), transpose(R_expanded(1:2:end, 1)), 'k--o', 'LineWidth', 1.5);
+title('Deslocamento ao longo do tempo');
+xlabel('Posição (m)');
+ylabel('Deslocamento (m)');
+grid on;
+
+% Find the maximum displacement for consistent y-axis limits
+max_disp = max(max(abs(R_expanded(1:2:end, :))));
+ylim([-max_disp * 1.1 max_disp * 1.1]);
+
+% Text display for time
+time_text = text(0.05, 0.95, 'Tempo: 0.000 s', 'Units', 'normalized');
+
+% Animation parameters
+frame_skip = max(1, floor(n_steps / 100)); % Skip frames to speed up animation if too many steps
+pause_time = 0.05; % Time between frames in seconds
+is_running = true; % Flag to control animation
+
+% Run the animation
+for i = 1:n_steps
+    % Update the plot data
+    set(plot_handle, 'YData', transpose(R_expanded(1:2:end, i)));
+
+    % Update time display
+    set(time_text, 'String', ['Tempo: ' num2str((i - 1) * h, '%.3f') ' s']);
+
+    % Refresh the display
+    drawnow;
+
+    % Pause to control animation speed
+    pause(pause_time);
+end

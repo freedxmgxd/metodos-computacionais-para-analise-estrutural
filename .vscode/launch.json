@@ -11,6 +11,15 @@
       "program": "${file}",
       "octave": "octave --persist",
       "sourceFolder": "${workspaceFolder}",
+      "autoTerminate": false
     },
-  ]
+    {
+      "type": "OctaveDebugger",
+      "request": "launch",
+      "name": "Interactive Mode",
+      "program": "${file}",
+      "octave": "octave --no-gui",
+      "autoTerminate": false
+    }
+  ],
 }
