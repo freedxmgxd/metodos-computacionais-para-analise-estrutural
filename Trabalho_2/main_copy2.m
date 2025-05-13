@@ -2,6 +2,14 @@ clear all
 close all
 clc
 
+% Carregar pacotes necessários
+try
+    pkg load video;
+    disp('Pacote video carregado com sucesso');
+catch
+    warning('Falha ao carregar o pacote video. Salvamento de vídeo pode não funcionar.');
+end
+
 L_total = 3; % m
 n_sections = 20;
 L = L_total / n_sections; % m
@@ -11,7 +19,7 @@ I_beam = 8 * 10^(-4); % m^4
 A_beam = 2 * 10^(-2); % m^2
 rho_beam = 7800; % kg/m^3
 
-f_cut = 100; % Hz
+f_cut = 2000;% Hz
 
 total_time = 1; % s
 
@@ -79,10 +87,10 @@ h = 2 * pi / (frequency * 10);
 critical_damping = 0.05; % Critical damping ratio
 
 A = [1 / modes(1), modes(1);
-    1 / modes(2), modes(2); ]
+    1 / modes(2), modes(2); ];
 
 b = 2 * critical_damping * [1;
-                    1; ];
+                        1; ];
 
 x = A \ b;
 
@@ -105,7 +113,7 @@ L_fraction = 1/4; % Fraction of the total length where the force is applied
 
 element_force = floor(n_sections * L_fraction) + 1;
 
-node = (element_force * 2 - 1)
+nodes = [(element_force * 2 - 1), n_sections + 1]
 
 for n = 1:(0.2 / h)
 
@@ -149,7 +157,44 @@ Dddot(D0, :) = [];
 %     fprintf('w_%d = %.4f\n', i, modes(i));
 % end
 
+A_1 = ((4 / h^2) * M_reduzido + (2 / h) * C_reduzido);
+A_2 = ((4 / h) * M_reduzido + C_reduzido);
+A_3 = M_reduzido;
+
+Dddot(:, 1) = inv(M_reduzido) * (R(:, 1) - C_reduzido * Ddot(:, 1) - K_reduzido * D(:, 1));
+R_til(:, 1) = R(:, 1) + A_1 * D(:, 1) + A_2 * Ddot(:, 1) + A_3 * Dddot(:, 1);
+
+K_til = (4 / h^2) * M_reduzido + (2 / h) * C_reduzido + K_reduzido;
+
+for n = 2:n_steps
+
+    R_til(:, n) = R(:, n) + A_1 * D(:, n - 1) + A_2 * Ddot(:, n - 1) + A_3 * Dddot(:, n - 1);
+
+    D(:, n) = inv(K_til) * R_til(:, n);
+
+    Ddot(:, n) = (2 / h) * D(:, n) - (2 / h) * D(:, n - 1) - Ddot(:, n - 1);
+    Dddot(:, n) = (4 / (h^2)) * D(:, n) - (4 / (h^2)) * D(:, n - 1) - (4 / h) * Ddot(:, n - 1) - Dddot(:, n - 1);
+end
+
+R_expanded = zeros((n_sections + 1) * 2, n_steps);
+R_til_expanded = zeros((n_sections + 1) * 2, n_steps);
+D_expanded = zeros((n_sections + 1) * 2, n_steps);
+Ddot_expanded = zeros((n_sections + 1) * 2, n_steps);
+Dddot_expanded = zeros((n_sections + 1) * 2, n_steps);
+
+R_expanded(remaining_indices, :) = R;
+R_til_expanded(remaining_indices, :) = R_til;
+D_expanded(remaining_indices, :) = D;
+Ddot_expanded(remaining_indices, :) = Ddot;
+Dddot_expanded(remaining_indices, :) = Dddot;
+
 % Plotar os 3 primeiros modos naturais normalizados
+% Create directory if it doesn't exist
+output_dir = 'output_figures';
+
+if ~exist(output_dir, 'dir')
+    mkdir(output_dir);
+end
 
 figure;
 hold on;
@@ -198,36 +243,14 @@ ylabel('Amplitude Normalizada');
 legend(legends);
 grid on;
 
-A_1 = ((4 / h^2) * M_reduzido + (2 / h) * C_reduzido);
-A_2 = ((4 / h) * M_reduzido + C_reduzido);
-A_3 = M_reduzido;
+% Define all figure parameters in a single array
+fig_params = [0, 0, 1280, 720];
 
-Dddot(:, 1) = inv(M_reduzido) * (R(:, 1) - C_reduzido * Ddot(:, 1) - K_reduzido * D(:, 1));
-R_til(:, 1) = R(:, 1) + A_1 * D(:, 1) + A_2 * Ddot(:, 1) + A_3 * Dddot(:, 1);
-
-K_til = (4 / h^2) * M_reduzido + (2 / h) * C_reduzido + K_reduzido;
-
-for n = 2:n_steps
-
-    R_til(:, n) = R(:, n) + A_1 * D(:, n - 1) + A_2 * Ddot(:, n - 1) + A_3 * Dddot(:, n - 1);
-
-    D(:, n) = inv(K_til) * R_til(:, n);
-
-    Ddot(:, n) = (2 / h) * D(:, n) - (2 / h) * D(:, n - 1) - Ddot(:, n - 1);
-    Dddot(:, n) = (4 / (h^2)) * D(:, n) - (4 / (h^2)) * D(:, n - 1) - (4 / h) * Ddot(:, n - 1) - Dddot(:, n - 1);
-end
-
-R_expanded = zeros((n_sections + 1) * 2, n_steps);
-R_til_expanded = zeros((n_sections + 1) * 2, n_steps);
-D_expanded = zeros((n_sections + 1) * 2, n_steps);
-Ddot_expanded = zeros((n_sections + 1) * 2, n_steps);
-Dddot_expanded = zeros((n_sections + 1) * 2, n_steps);
-
-R_expanded(remaining_indices, :) = R;
-R_til_expanded(remaining_indices, :) = R_til;
-D_expanded(remaining_indices, :) = D;
-Ddot_expanded(remaining_indices, :) = Ddot;
-Dddot_expanded(remaining_indices, :) = Dddot;
+% Save the figure in the created directory with specified resolution
+filename = fullfile(output_dir, 'modos_vibracao');
+set(gcf, 'Position', fig_params); % Set figure size
+print(filename, '-dpng', '-r100'); % PNG format with specified DPI
+disp(['Figure saved to: ', filename]);
 
 % Plotar uma coluna de D em uma figura
 
@@ -244,74 +267,95 @@ xlabel('Posição (m)');
 ylabel('Deslocamento (m)');
 grid on;
 
+% Save the figure in the created directory with specified resolution
+filename = fullfile(output_dir, 'envelope_deslocamento');
+set(gcf, 'Position', fig_params); % Set figure size
+print(filename, '-dpng', '-r100'); % PNG format with specified DPI
+disp(['Figure saved to: ', filename]);
+
+
 figure;
 % Subplot for force
 subplot(2, 1, 1);
-plot((0:n_steps - 1) * h, R_expanded(node, :), 'LineWidth', 2);
-title(['Força no nó ', num2str((node + 1) / 2)]);
+plot((0:n_steps - 1) * h, R_expanded(nodes(1), :), 'k--o', 'LineWidth', 2);
+title(['Força no nó ', num2str((nodes(1) + 1) / 2)]);
 xlabel('Tempo (s)');
 ylabel('Força (N)');
 % ylim([-max_force_value max_force_value]); % Set unified y-axis limits
 grid on;
 
 subplot(2, 1, 2);
-plot((0:L_total / n_sections:L_total), transpose(R_expanded(1:2:end, 1)), 'k--.', 'LineWidth', 0.5);
-title(['Força no nó ', num2str((node + 1) / 2)]);
+plot((0:L_total / n_sections:L_total), transpose(R_expanded(1:2:end, 1)), 'ko', 'LineWidth', 0.5);
+title(['Força no t=0']);
 xlabel('Posição (m)');
 ylabel('Força (N)');
 % ylim([-max_force_value max_force_value]); % Set unified y-axis limits
 grid on;
 
-% Plotar numa só figura os deslocamentos, velocidades e aceleraçoes no node (n_sections + 1)
-figure;
-subplot(3, 1, 1);
-plot((0:n_steps - 1) * h, D_expanded(node, :), 'LineWidth', 2);
-title(['Deslocamento no nó ', num2str((node + 1) / 2)]);
-xlabel('Tempo (s)');
-ylabel('Deslocamento (m)');
-% ylim([-2 2]); % Set unified y-axis limits
-grid on;
-subplot(3, 1, 2);
-plot((0:n_steps - 1) * h, Ddot_expanded(node, :), 'LineWidth', 2);
-title(['Velocidade no nó ', num2str((node + 1) / 2)]);
-xlabel('Tempo (s)');
-ylabel('Velocidade (m/s)');
-% ylim([-20 20]); % Set unified y-axis limits
-grid on;
-subplot(3, 1, 3);
-plot((0:n_steps - 1) * h, Dddot_expanded(node, :), 'LineWidth', 2);
-title(['Aceleração no nó ', num2str((node + 1) / 2)]);
-xlabel('Tempo (s)');
-ylabel('Aceleração (m/s²)');
-% ylim([-200 200]); % Set unified y-axis limits
-grid on;
+% Save the figure in the created directory with specified resolution
+filename = fullfile(output_dir, 'forca');
+set(gcf, 'Position', fig_params); % Set figure size
+print(filename, '-dpng', '-r100'); % PNG format with specified DPI
+disp(['Figure saved to: ', filename]);
 
-% Plotar numa só figura os deslocamentos, velocidades e aceleraçoes no node (n_sections + 1)
-figure;
-subplot(3, 1, 1);
-plot((0:n_steps - 1) * h, D_expanded(node + 1, :), 'LineWidth', 2);
-title(['Rotação no nó ', num2str((node + 1) / 2)]);
-xlabel('Tempo (s)');
-ylabel('Rotação (rad)');
-% ylim([-2 2]); % Set unified y-axis limits
-grid on;
-subplot(3, 1, 2);
-plot((0:n_steps - 1) * h, Ddot_expanded(node + 1, :), 'LineWidth', 2);
-title(['Velocidade angular no nó ', num2str((node + 1) / 2)]);
-xlabel('Tempo (s)');
-ylabel('Velocidade (rad/s)');
-% ylim([-20 20]); % Set unified y-axis limits
-grid on;
-subplot(3, 1, 3);
-plot((0:n_steps - 1) * h, Dddot_expanded(node + 1, :), 'LineWidth', 2);
-title(['Aceleração angular no nó ', num2str((node + 1) / 2)]);
-xlabel('Tempo (s)');
-ylabel('Aceleração (rad/s²)');
-% ylim([-200 200]); % Set unified y-axis limits
-grid on;
+for node = nodes
+    % Plotar numa só figura os deslocamentos, velocidades e aceleraçoes no node (n_sections + 1)
+    figure;
+    subplot(3, 2, 1);
+    plot((0:n_steps - 1) * h, D_expanded(node, :), 'LineWidth', 2);
+    title(['Deslocamento no nó ', num2str((node + 1) / 2)]);
+    xlabel('Tempo (s)');
+    ylabel('Deslocamento (m)');
+    % ylim([-2 2]); % Set unified y-axis limits
+    grid on;
+    subplot(3, 2, 3);
+    plot((0:n_steps - 1) * h, Ddot_expanded(node, :), 'LineWidth', 2);
+    title(['Velocidade no nó ', num2str((node + 1) / 2)]);
+    xlabel('Tempo (s)');
+    ylabel('Velocidade (m/s)');
+    % ylim([-20 20]); % Set unified y-axis limits
+    grid on;
+    subplot(3, 2, 5);
+    plot((0:n_steps - 1) * h, Dddot_expanded(node, :), 'LineWidth', 2);
+    title(['Aceleração no nó ', num2str((node + 1) / 2)]);
+    xlabel('Tempo (s)');
+    ylabel('Aceleração (m/s²)');
+    % ylim([-200 200]); % Set unified y-axis limits
+    grid on;
+    subplot(3, 2, 2);
+    plot((0:n_steps - 1) * h, D_expanded(node + 1, :), 'LineWidth', 2);
+    title(['Rotação no nó ', num2str((node + 1) / 2)]);
+    xlabel('Tempo (s)');
+    ylabel('Rotação (rad)');
+    % ylim([-2 2]); % Set unified y-axis limits
+    grid on;
+    subplot(3, 2, 4);
+    plot((0:n_steps - 1) * h, Ddot_expanded(node + 1, :), 'LineWidth', 2);
+    title(['Velocidade angular no nó ', num2str((node + 1) / 2)]);
+    xlabel('Tempo (s)');
+    ylabel('Velocidade (rad/s)');
+    % ylim([-20 20]); % Set unified y-axis limits
+    grid on;
+    subplot(3, 2, 6);
+    plot((0:n_steps - 1) * h, Dddot_expanded(node + 1, :), 'LineWidth', 2);
+    title(['Aceleração angular no nó ', num2str((node + 1) / 2)]);
+    xlabel('Tempo (s)');
+    ylabel('Aceleração (rad/s²)');
+    % ylim([-200 200]); % Set unified y-axis limits
+    grid on;
+
+    % Save the figure in the created directory
+    name = ['deslocamento_forca_' num2str(node)];
+    filename = fullfile(output_dir, '', name);
+    set(gcf, 'Position', fig_params); % Set figure size
+    print(filename, '-dpng', '-r100'); % PNG format with specified DPI
+    disp(['Figure saved to: ', filename]);
+
+end
 
 % Create figure for displacement animation
 figure;
+set(gcf, 'Position', fig_params); % Set figure size for better quality
 
 % Create the main plot axes
 plot_handle = plot((0:L_total / n_sections:L_total), transpose(D_expanded(1:2:end, 1)), 'k--o', 'LineWidth', 1.5);
@@ -327,10 +371,20 @@ ylim([-max_disp * 1.1 max_disp * 1.1]);
 % Text display for time
 time_text = text(0.05, 0.95, 'Tempo: 0.000 s', 'Units', 'normalized');
 
+% Setup for saving animation
+video_filename = fullfile(output_dir, 'displacement_animation.avi');
+if exist(video_filename, 'file')
+    delete(video_filename);  % Delete existing file
+end
+% Use default AVI format which is guaranteed to work with Octave
+video_writer = VideoWriter(video_filename);
+disp('Using AVI format for video output');
+video_writer.FrameRate = 30; % Frame rate of the output video
+open(video_writer);
+
 % Animation parameters
-frame_skip = max(1, floor(n_steps / 100)); % Skip frames to speed up animation if too many steps
-pause_time = 0.05; % Time between frames in seconds
-is_running = true; % Flag to control animation
+% frame_skip = max(1, floor(n_steps / 100)); % Skip frames to speed up animation if too many steps
+pause_time = 0.01; % Time between frames in seconds
 
 % Run the animation
 for i = 1:n_steps
@@ -342,10 +396,18 @@ for i = 1:n_steps
 
     % Refresh the display
     drawnow;
-
-    % Pause to control animation speed
+    
+    % Capture the frame and write to video
+    frame = getframe(gcf);
+    writeVideo(video_writer, frame);
+    
+    % Pause to control animation speed (only when displaying)
     pause(pause_time);
 end
+
+% Close the video file
+close(video_writer);
+disp(['Animation saved to: ', video_filename]);
 
 % Create figure for displacement animation
 figure;
